@@ -238,6 +238,112 @@ Your text comes here. Separate text sections with
 
 
 
+
+\section{Bayesian Cubature}
+\label{sec:BC} 
+% \JRNote{Briefly explain Bayesian approach using the words of diaconis, poincare work ..}
+
+
+The Bayesian approach for numerical analysis was popularized by Diaconis \cite{Dia88a}. The earliest reference for such kind of approach dates back to Poincar\'e, where, the theory of interpolation was discussed.
+Diaconis motivates the reader by interpreting the most well known numerical methods, 1) trapezoidal rule and 2) splines, from the statistical point of view with whatever is known about the integrand as prior information. 
+For example, the trapezoidal rule can be interpreted as a Bayesian method with prior information being modeled as a Brownian motion in the sample space $\mathcal{C}[0,1)$, the space of continuous functions. %, with normal prior.
+
+This research is focused on the Bayesian approach for numerical integration that is known as Bayesian cubature as introduced by O'Hagan \cite{OHagen1991}.  % $\mathbb{P}_f$
+Bayesian cubature returns a probability distribution, that expresses belief about the true value of integral, $\mu(f)$.
+This posterior probability distribution is based on a prior that depends on $f$, which is computed via Bayes' rule using the \emph{data} contained in the function evaluations \cite{BriEtal18a}. 
+%The maximum likelihood estimate of $\mathbb{P}_f$ can be interpreted as a point estimate of the integral. 
+The distribution in general captures numerical uncertainty due to the fact that we have only used a finite number of function values to evaluate the integral.
+
+\subsection{Bayesian Posterior Error}
+\label{sec:BayesPostErr}
+
+We assume the integrand, $f$, is an instance of a stochastic Gaussian process, i.e., $f \sim \mathcal{GP}(m,s^2 C_\vtheta)$.  Specifically, $f$ is a real-valued random function with constant mean $m$ and covariance function $s^2C_\vtheta$, where $s$ is a positive scale factor, and $C_\vtheta: [0,1]^d \times [0,1]^d \to \mathbb{R} $ is a symmetric, positive-definite function and, parameterized by $\vtheta$:
+\begin{multline} \label{FJH:eq:CondPosDef}
+\mC^T = \mC,  \quad \va^T \mC \va > 0, \quad \text{where }  \mC = \left(  C_\vtheta(\vx_i,\vx_j)  \right)_{i,j=1}^n,\\
+\text{for all } \va \ne 0, \;
+n\in \mathbb{N}, \; \text{distinct} \; \vx_1, \ldots, \vx_n \in [0,1]^d.
+\end{multline}
+The covariance function, $C$, and the Gram matrix, $\mC$, depend implicitly on $\vtheta$, but the notation may omit this for simplicity's sake.
+Procedures for estimating or integrating out the hyperparameters $m$, $s$, and $\vtheta$ are explained later in this section.
+
+For a Gaussian process, all vectors of linear functionals of $f$ have a multivariate Gaussian distribution. 
+%Defining  $\vf  := \left( f(\vx_i)\right)_{i=1}^n$, the integrand values sampled at $\left( \vx_i\right)_{i=1}^n$,  as the multivariate Gaussian vector of function values, it follows that 
+For any deterministic sampling scheme with distinct nodes, $\{\vx_i\}_{i=1}^n$, and defining  $\vf  := \left( f(\vx_i)\right)_{i=1}^n$ as the multivariate Gaussian vector of function values, it follows from the definition of a Gaussian process that 
+\begin{subequations} \label{eqn:fGaussDist}
+	\begin{align}
+	\vf  & \sim \calN(m \vone, s^2 \mC), \\
+	\mu & \sim \calN(m, s^2 c_0), 
+	\\
+	\text{where }
+	c_0 &:= \int_{[0,1]^{d} \times [0,1]^{d}} C_\vtheta(\vx,\vt) \, \dif{\vx} \, \dif{\vt}, \\
+	\cov(\vf, \mu) &= \left(  \int_{[0,1]^d} C(\vt,\vx_i) \, \D \vt \right)_{i=1}^n  =: \vc.
+	\end{align}
+\end{subequations}
+Here, $c_0$ and $\vc$ depend implicitly on $\vtheta$.  We assume the covariance function $C$ is simple enough that the integrals in these definitions can be computed analytically.
+We need the following lemma to derive the posterior error of our cubature. 
+
+\begin{lemma} \cite[(A.6), (A.11--13)]{RasWil06a} \label{thrm:condDist} If $\vY = (\vY_1, \vY_2)^T \sim \calN (\vm,\mC)$, where $\vY_1$ and $\vY_2$ are random vectors of arbitrary length, and 
+	\begin{gather*}
+	\vm = \begin{pmatrix} \vm_1 \\ \vm_2 \end{pmatrix} = \begin{pmatrix} \Ex(\vY_1) \\ \Ex(\vY_2) \end{pmatrix}, \\
+	\mC = \begin{pmatrix}
+	\mC_{11} & \mC_{21}^T \\ 	\mC_{21} & \mC_{22}
+	\end{pmatrix} =
+	\begin{pmatrix}
+	\var(\vY_{1}) & \cov(\vY_{1}, \vY_2) \\ 	\cov(\vY_2,\vY_{1}) & \var(\vY_{2})
+	\end{pmatrix} 
+	\end{gather*}
+	then 
+	\begin{align*}
+	\vY_1 \vert \vY_2 \; \sim \; \calN \bigl(\vm_1 + \mC_{21}^T \mC_{22}^{-1}(\vY_2 - \vm_2), \quad \mC_{11} - \mC_{21}^T \mC_{22}^{-1} \mC_{21} \bigr).
+	\end{align*}
+	Moreover, the inverse of the matrix $\mC$ may be partitioned as
+	\begin{gather*}
+	\mC^{-1} = \begin{pmatrix} \mA_{11} & \mA_{21}^T \\ \mA_{21} & \mA_{22} \end{pmatrix}, \\
+	\mA_{11} = (\mC_{11} - \mC_{12} \mC_{22}^{-1} \mC_{21})^{-1}, \qquad 
+	\mA_{21} = -  \mC_{22}^{-1} \mC_{21} \mA_{11}, \\ 
+	\mA_{22} = \mC_{22}^{-1} + \mC_{22}^{-1} \mC_{21} \mA_{11} \mC_{21}^T \mC_{22}^{-1}.
+	\end{gather*}
+\end{lemma}
+
+It follows from Lemma \ref{thrm:condDist} that the \emph{conditional} distribution of the integral given observed function values, $\vf = \vy$ is also Gaussian:
+\begin{align} \label{eqn:condInteg}
+\mu | (\vf = \vy) \sim \calN \bigl(m (1 - \vc^T \mC^{-1} \vone)  + \vc^T \mC^{-1} \vy, \;\;
+s^2(c_0  -\vc ^T \mC^{-1} \vc) \bigr).
+\end{align}
+The natural choice for  the cubature is the posterior mean of the integral, namely, 
+\begin{equation}
+\label{eqn:BayesCub}
+\widehat{\mu}  \vert ( \vf = \vy)
+= m(1 - \vone^T  \mC^{-1}\vc )
++ \vc^T \mC^{-1} \vy,
+\end{equation}
+which takes the form of \eqref{eqn:defn_hmu}.
+Under this definition, the cubature error has zero mean and a variance depending on the choice of nodes:
+\begin{equation*}
+%\label{eqn_error_cond_prob}
+(\mu-\hmu) | (\vf = \vy)
+\sim  \calN 
+\left(
+0, \quad
+s^2 (c_0 - \vc^T\mC^{-1}\vc) 
+\right).
+\end{equation*}
+A credible interval for the integral is given by 
+\begin{subequations} \label{eqn_prob_confidence_interval}
+	\begin{gather}
+	\mathbb{P}_f \left[
+	|\mu-\hmu| \leq \err_{\CI}
+	\right] = 99\%, \\
+	\err_{\CI} = 2.58 s \sqrt{c_{0} - \vc^T\mC^{-1}\vc}.
+	\end{gather}
+\end{subequations}
+Naturally, $2.58$ and $99\%$ can be replaced by other quantiles and credible levels.
+
+
+
+
+
+
 \section{Full Bayes}
 
 Rather than using maximum likelihood to determine $m$ and $s$, one can treat them as hyper-parameters with a non-informative, conjugate prior, namely $\vrho_{m,s^2}(\xi, \lambda) \propto 1/\lambda$. Then the posterior density for the integral given the data using Bayes theorem is,
@@ -330,10 +436,10 @@ where
 Here $t_{n-1,0.995}$ denotes the $99.5$ percentile of a standard Student's $t$-distribution with $n-1$ degrees of freedom. 
 This means that $\mu \vert (\vf = \vy )$, properly centered and scaled, has a Student's $t$-distribution with $n-1$ degrees of freedom.  
 The estimated integral is the same as in the empirical Bayes case, $\hmu_{\textup{full}} = \hmu_{\MLE}$, but the credible interval is wider.
-In other words, the stopping criterion for the full Bayes case is more conservative than that in the empirical Bayes case, \eqref{eqn_prob_CI_MLE}.
+In other words, the stopping criterion for the full Bayes case is more conservative than that in the empirical Bayes case, \eqref{eqn_prob_CI_MLE} \cite{JagHic19a}.
 
 
-Because the shape parameter, $\vtheta$, enters the definition of the covariance kernel in a non-trivial way, the only way to treat it as a hyperparameter and assign a tractable prior would be for the prior to be discrete.  We believe in practice that choosing such a prior involves more guesswork than using the empirical Bayes estimate of $\vtheta$ in \eqref{eqn:thetaMLE} or the cross-validation approach described next.
+Because the shape parameter, $\vtheta$, enters the definition of the covariance kernel in a non-trivial way, the only way to treat it as a hyperparameter and assign a tractable prior would be for the prior to be discrete.  We believe in practice that choosing such a prior involves more guesswork than using the empirical Bayes estimate of $\vtheta$ in \eqref{eqn:thetaMLE} \cite{JagHic19a} or the cross-validation approach described next.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -748,7 +854,7 @@ m_\MLE=\frac{(\vone^T \mCInv \vy)}{\vone^T\mCInv\vone}
 
 
 
-
+\iffalse
 \section{Section title}
 \label{sec:1}
 Text with citations \cite{RefB} and \cite{RefJ}.
@@ -796,6 +902,8 @@ number & number & number \\
 \noalign{\smallskip}\hline
 \end{tabular}
 \end{table}
+\fi
+
 
 
 %\begin{acknowledgements}
@@ -809,20 +917,8 @@ number & number & number \\
 %\bibliographystyle{spphys}       % APS-like style for physics
 %\bibliography{}   % name your BibTeX data base
 
-% Non-BibTeX users please use
-\begin{thebibliography}{}
-%
-% and use \bibitem to create references. Consult the Instructions
-% for authors for reference list style.
-%
-\bibitem{RefJ}
-% Format for Journal Reference
-Author, Article title, Journal, Volume, page numbers (year)
-% Format for books
-\bibitem{RefB}
-Author, Book title, page numbers. Publisher, place (year)
-% etc
-\end{thebibliography}
+\bibliographystyle{abbrvnat}
+\bibliography{FJHown23,FJH23}
 
 \end{document}
 % end of file template.tex
