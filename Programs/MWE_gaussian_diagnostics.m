@@ -8,11 +8,12 @@ close all
 
 fNames = {'ExpCos','Keister','rand'};
 ptransforms = {'C1','C1sin', 'none'};
-fName = fNames{1};
-ptransform = ptransforms{2};
+fName = fNames{3};
+ptransform = ptransforms{3};
 
-npts = 2^4;  % max 14
+npts = 2^8;  % max 14
 dim = 1;
+r = 2;
 shift = rand(1,dim);
 
 [~,xlat_] = simple_lattice_gen(npts,dim,shift,true);
@@ -22,7 +23,7 @@ if strcmp(fName,'ExpCos')
 elseif strcmp(fName, 'Keister')
   integrand = @(x) keisterFunc(x,dim,1/sqrt(2)); % a=0.8
 else
-  integrand = @(x) f_rand(x);
+  integrand = @(x) f_rand(x,r);
 end
 
 integrand_p = doPeriodTx(integrand, ptransform);
@@ -31,8 +32,11 @@ y = integrand_p(xlat_);
 ftilde = fft(y);
 ftilde(1) = 0;  % ftilde = \mV^H(\vf - m \vone)
 if dim==1
-  figure; scatter(xlat_, y, 10)
-  title('Integrand')
+  hFigIntegrand = figure; scatter(xlat_, y, 10)
+  title(sprintf('%s_n-%d_Tx-%s', ...
+      fName, npts, ptransform))
+  saveas(hFigIntegrand, sprintf('%s_n-%d_Tx-%s.png', ...
+      fName, npts, ptransform))
 end
 
 thetaOpt = 1;  %0.9;
@@ -46,7 +50,8 @@ ftilde = real(ftilde);
     if strcmp(type, 'normplot')
       normplot(w_ftilde)
     else
-      qqplot(w_ftilde)
+      qqplot(w_ftilde); hold on
+      plot([-3 3], [-3 3],'-')
     end
     
     title(sprintf('%s n=%d Tx=%s r=%1.2f theta=%1.2f', ...
@@ -82,7 +87,7 @@ end
 
 
 % gaussian random function
-function fval = f_rand(xpts)
+function fval = f_rand(xpts, r)
 theta = 1;
 rng(202326) % initialize random number generator for reproducability
 
@@ -92,8 +97,8 @@ f_s = randn(N, 1);
 f_0 = randn(1, 1);
 kvec = (1:N)';
 argx = @(x) 2*pi*bsxfun(@times, kvec, x);
-f_c_ = @(x)(f_c./kvec).*cos(argx(x));
-f_s_ = @(x)(f_s./kvec).*sin(argx(x));
+f_c_ = @(x)(f_c./kvec.^(r/4)).*cos(argx(x));
+f_s_ = @(x)(f_s./kvec.^(r/4)).*sin(argx(x));
 f_ran = @(x,theta) prod((f_0 + theta * sum(f_c_(x) + f_s_(x) )), 2) ;
 [n,~]=size(xpts);
 fval=zeros(n,1);
