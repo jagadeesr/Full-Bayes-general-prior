@@ -13,7 +13,7 @@ ptransform = ptransforms{3};
 
 npts = 2^8;  % max 14
 dim = 1;
-r = 2;
+rfun = 0.5;
 shift = rand(1,dim);
 
 [~,xlat_] = simple_lattice_gen(npts,dim,shift,true);
@@ -23,7 +23,7 @@ if strcmp(fName,'ExpCos')
 elseif strcmp(fName, 'Keister')
   integrand = @(x) keisterFunc(x,dim,1/sqrt(2)); % a=0.8
 else
-  integrand = @(x) f_rand(x,r);
+  integrand = @(x) f_rand(x,rfun);
 end
 
 integrand_p = doPeriodTx(integrand, ptransform);
@@ -40,9 +40,35 @@ if dim==1
 end
 
 thetaOpt = 1;  %0.9;
-ftilde = real(ftilde);
+%ftilde = real(ftilde);
 
-  function create_plots(type)
+rVec = [2 ];
+
+for r=rVec
+  
+  lambda = kernel(r, xlat_, thetaOpt);
+  
+  % apply transform
+  % $\vZ = \frac 1n \mV \mLambda^{-\frac 12} \mV^H(\vf - m \vone)$
+  % ifft also includes 1/n division
+  temp1 = ifft(ftilde./sqrt(lambda));
+  w_ftilde = real(temp1);
+  
+  % create_plots('normplot')
+  create_plots('qqplot', w_ftilde)
+  
+  % Shapiro-Wilk test
+%   [H, pValue, W] = swtest(w_ftilde);
+%   Hval='true';
+%   if H==true
+%     Hval='false';
+%   end
+%   fprintf('Shapiro-Wilk test: Normal=%s, pValue=%1.3f, W=%1.3f\n', Hval, pValue, W);
+end
+
+end
+
+  function create_plots(type,w_ftilde)
     hFigNormplot = figure();
     set(hFigNormplot,'defaultaxesfontsize',16, ...
       'defaulttextfontsize',16, ... %make font larger
@@ -60,51 +86,21 @@ ftilde = real(ftilde);
       type, fName, npts, ptransform, r))
   end
 
-rVec = [2, ];
-
-for r=rVec
-  
-  lambda = kernel(r, xlat_, thetaOpt);
-  
-  % apply transform
-  % $\vZ = \frac 1n \mV \mLambda^{-\frac 12} \mV^H(\vf - m \vone)$
-  % ifft also includes 1/n division
-  w_ftilde = real(ifft(ftilde./sqrt(lambda)));
-  
-  % create_plots('normplot')
-  create_plots('qqplot')
-  
-  % Shapiro-Wilk test
-  [H, pValue, W] = swtest(w_ftilde);
-  Hval='true';
-  if H==true
-    Hval='false';
-  end
-  fprintf('Shapiro-Wilk test: Normal=%s, pValue=%1.3f, W=%1.3f\n', Hval, pValue, W);
-end
-
-end
-
-
 % gaussian random function
-function fval = f_rand(xpts, r)
+function fval = f_rand(xpts, rfun)
 theta = 1;
 rng(202326) % initialize random number generator for reproducability
 
 N = 2^(15);
-f_c = randn(N, 1);
-f_s = randn(N, 1);
+f_c = randn(1, N);
+f_s = randn(1, N);
 f_0 = randn(1, 1);
-kvec = (1:N)';
-argx = @(x) 2*pi*bsxfun(@times, kvec, x);
-f_c_ = @(x)(f_c./kvec.^(r/4)).*cos(argx(x));
-f_s_ = @(x)(f_s./kvec.^(r/4)).*sin(argx(x));
-f_ran = @(x,theta) prod((f_0 + theta * sum(f_c_(x) + f_s_(x) )), 2) ;
-[n,~]=size(xpts);
-fval=zeros(n,1);
-for i=1:n
-  fval(i) = f_ran(xpts(i,:),theta);
-end
+kvec = (1:N);
+argx = @(x) 2*pi*x*kvec;
+f_c_ = @(x)(f_c./kvec.^(rfun)).*cos(argx(x));
+f_s_ = @(x)(f_s./kvec.^(rfun)).*sin(argx(x));
+f_ran = @(x,theta) f_0 + theta * sum(f_c_(x) + f_s_(x),2) ;
+fval = f_ran(xpts,theta);
 end
 
 function Lambda = kernel(r, xun, theta)
