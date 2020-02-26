@@ -13,7 +13,11 @@ ptransform = ptransforms{3};
 
 npts = 2^8;  % max 14
 dim = 1;
-rfun = 0.5;
+%parameters for random function
+rfun = 2;
+A = 3;
+
+
 shift = rand(1,dim);
 
 [~,xlat_] = simple_lattice_gen(npts,dim,shift,true);
@@ -23,7 +27,7 @@ if strcmp(fName,'ExpCos')
 elseif strcmp(fName, 'Keister')
   integrand = @(x) keisterFunc(x,dim,1/sqrt(2)); % a=0.8
 else
-  integrand = @(x) f_rand(x,rfun);
+  integrand = @(x) f_rand(x,rfun,A);
 end
 
 integrand_p = doPeriodTx(integrand, ptransform);
@@ -34,7 +38,7 @@ ftilde(1) = 0;  % ftilde = \mV^H(\vf - m \vone)
 if dim==1
   hFigIntegrand = figure; scatter(xlat_, y, 10)
   title(sprintf('%s_n-%d_Tx-%s', ...
-      fName, npts, ptransform))
+      fName, npts, ptransform), 'interpreter','none')
   saveas(hFigIntegrand, sprintf('%s_n-%d_Tx-%s.png', ...
       fName, npts, ptransform))
 end
@@ -42,7 +46,7 @@ end
 thetaOpt = 1;  %0.9;
 %ftilde = real(ftilde);
 
-rVec = [2 ];
+rVec = [2 4];
 
 for r=rVec
   
@@ -80,21 +84,20 @@ end
       plot([-3 3], [-3 3],'-')
     end
     
-    title(sprintf('%s n=%d Tx=%s r=%1.2f theta=%1.2f', ...
-      fName, npts, ptransform, r, thetaOpt))
-    saveas(hFigNormplot, sprintf('%s_%s_n-%d_Tx-%s_r-%d.png', ...
-      type, fName, npts, ptransform, r))
+%     title(sprintf('%s n=%d Tx=%s r=%1.2f theta=%1.2f', ...
+%       fName, npts, ptransform, r, thetaOpt))
+%     saveas(hFigNormplot, sprintf('%s_%s_n-%d_Tx-%s_r-%d.png', ...
+%       type, fName, npts, ptransform, r))
   end
 
 % gaussian random function
-function fval = f_rand(xpts, rfun)
-theta = 1;
+function fval = f_rand(xpts, rfun, A)
+theta = sqrt(2 * factorial(2*rfun))/((2*pi)^rfun);
 rng(202326) % initialize random number generator for reproducability
-
 N = 2^(15);
 f_c = randn(1, N);
 f_s = randn(1, N);
-f_0 = randn(1, 1);
+f_0 = randn(1, 1) + A;
 kvec = (1:N);
 argx = @(x) 2*pi*x*kvec;
 f_c_ = @(x)(f_c./kvec.^(rfun)).*cos(argx(x));
@@ -112,7 +115,7 @@ elseif r == 4
 else
   error('Bernoulli order=%d not implemented !', r);
 end
-kernelFunc = @(x) bernPoly(x);
+kernelFunc = @(x) -(-1).^(r/2)*bernPoly(x);
 
 temp_ = bsxfun(@times, (theta)*constMult, kernelFunc(xun));
 C1 = prod(1 + temp_, 2);
