@@ -13,8 +13,12 @@ ptransform = ptransforms{3};
 
 npts = 2^8;  % max 14
 dim = 1;
+rVec = [2 4];
+
+for r=rVec
+  
 %parameters for random function
-rfun = 2;
+rfun = r/2;  %1;
 A = 3;
 
 
@@ -38,17 +42,25 @@ ftilde(1) = 0;  % ftilde = \mV^H(\vf - m \vone)
 if dim==1
   hFigIntegrand = figure; scatter(xlat_, y, 10)
   title(sprintf('%s_n-%d_Tx-%s', ...
-      fName, npts, ptransform), 'interpreter','none')
+    fName, npts, ptransform), 'interpreter','none')
   saveas(hFigIntegrand, sprintf('%s_n-%d_Tx-%s.png', ...
-      fName, npts, ptransform))
+    fName, npts, ptransform))
 end
 
-thetaOpt = 1;  %0.9;
-%ftilde = real(ftilde);
+lnTheta_MLE = fminbnd(@(lna) ...
+  ObjectiveFunction(exp(lna),xlat_,(ftilde)), ...
+  -15,15,optimset('TolX',1e-2));
+thetaOpt = exp(lnTheta_MLE);
 
-rVec = [2 4];
+lnaMLE_opt = fminsearch(@(lna) ...
+  ObjectiveFunction(exp(lna),xlat_,(ftilde)), ...
+  0,optimset('TolX',1e-2));
+thetaOpt = exp(lnaMLE_opt);
 
-for r=rVec
+% thetaOpt = 1;  %0.9;
+% ftilde = real(ftilde);
+
+
   
   lambda = kernel(r, xlat_, thetaOpt);
   
@@ -62,37 +74,39 @@ for r=rVec
   create_plots('qqplot', w_ftilde)
   
   % Shapiro-Wilk test
-%   [H, pValue, W] = swtest(w_ftilde);
-%   Hval='true';
-%   if H==true
-%     Hval='false';
-%   end
-%   fprintf('Shapiro-Wilk test: Normal=%s, pValue=%1.3f, W=%1.3f\n', Hval, pValue, W);
+  %   [H, pValue, W] = swtest(w_ftilde);
+  %   Hval='true';
+  %   if H==true
+  %     Hval='false';
+  %   end
+  %   fprintf('Shapiro-Wilk test: Normal=%s, pValue=%1.3f, W=%1.3f\n', Hval, pValue, W);
 end
 
 end
 
-  function create_plots(type,w_ftilde)
-    hFigNormplot = figure();
-    set(hFigNormplot,'defaultaxesfontsize',16, ...
-      'defaulttextfontsize',16, ... %make font larger
-      'defaultLineLineWidth',0.75, 'defaultLineMarkerSize',8)
-    if strcmp(type, 'normplot')
-      normplot(w_ftilde)
-    else
-      qqplot(w_ftilde); hold on
-      plot([-3 3], [-3 3],'-')
-    end
-    
+function create_plots(type,w_ftilde)
+hFigNormplot = figure();
+set(hFigNormplot,'defaultaxesfontsize',16, ...
+  'defaulttextfontsize',16, ... %make font larger
+  'defaultLineLineWidth',0.75, 'defaultLineMarkerSize',8)
+if strcmp(type, 'normplot')
+  normplot(w_ftilde)
+else
+  qqplot(w_ftilde); hold on
+  plot([-3 3], [-3 3],'-')
+end
+
 %     title(sprintf('%s n=%d Tx=%s r=%1.2f theta=%1.2f', ...
 %       fName, npts, ptransform, r, thetaOpt))
 %     saveas(hFigNormplot, sprintf('%s_%s_n-%d_Tx-%s_r-%d.png', ...
 %       type, fName, npts, ptransform, r))
-  end
+end
 
 % gaussian random function
 function fval = f_rand(xpts, rfun, A)
 theta = sqrt(2 * factorial(2*rfun))/((2*pi)^rfun);
+% theta = (2 * factorial(rfun))/((2*pi)^rfun);
+
 rng(202326) % initialize random number generator for reproducability
 N = 2^(15);
 f_c = randn(1, N);
@@ -102,7 +116,7 @@ kvec = (1:N);
 argx = @(x) 2*pi*x*kvec;
 f_c_ = @(x)(f_c./kvec.^(rfun)).*cos(argx(x));
 f_s_ = @(x)(f_s./kvec.^(rfun)).*sin(argx(x));
-f_ran = @(x,theta) f_0 + theta * sum(f_c_(x) + f_s_(x),2) ;
+f_ran = @(x,theta) f_0 + theta * sum(f_c_(x)+ f_s_(x),2) ; %
 fval = f_ran(xpts,theta);
 end
 
@@ -123,6 +137,35 @@ C1 = prod(1 + temp_, 2);
 % matlab's builtin fft is much faster and accurate
 % eigenvalues must be real : Symmetric pos definite Kernel
 Lambda = real(fft(C1));
+
+end
+
+function [loss,Lambda,RKHSnorm] = ObjectiveFunction(theta,xun,ftilde)
+
+n = length(ftilde);
+% [Lambda, Lambda_ring] = kernel(xun,obj.kernType,a,obj.order,...
+%   obj.avoidCancelError);
+arbMean = true;
+order = 4;
+[Lambda] = kernel(order, xun, theta);
+      
+% compute RKHSnorm
+temp = abs(ftilde(Lambda~=0).^2)./(Lambda(Lambda~=0)) ;
+
+% compute loss: MLE
+if arbMean==true
+  RKHSnorm = sum(temp(2:end))/n;
+  temp_1 = sum(temp(2:end));
+else
+  RKHSnorm = sum(temp)/n;
+  temp_1 = sum(temp);
+end
+
+% ignore all zero eigenvalues
+loss1 = sum(log(Lambda(Lambda~=0)))/n;
+loss2 = log(temp_1);
+loss = (loss1 + loss2);
+fprintf('loss1 %1.3f loss2 %1.3f loss %1.3f a %1.3e\n', loss1, loss2, loss, theta)
 
 end
 
