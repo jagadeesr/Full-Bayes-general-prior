@@ -13,18 +13,17 @@ ptransform = ptransforms{3};
 
 npts = 2^8;  % max 14
 dim = 1;
-rVec = [2 4];
+rVec = [1.15 1.75 2.45];
 
 for r=rVec
   
   %parameters for random function
-  rfun = r/2;  %1;
+  rfun = r/2;
   A = 3;
-  
   
   shift = rand(1,dim);
   
-  [~,xlat_] = simple_lattice_gen(npts,dim,shift,true);
+  [~,xlat] = simple_lattice_gen(npts,dim,shift,true);
   
   if strcmp(fName,'ExpCos')
     integrand = @(x) exp(sum(cos(2*pi*x), 2));
@@ -36,43 +35,42 @@ for r=rVec
   
   integrand_p = doPeriodTx(integrand, ptransform);
   
-  y = integrand_p(xlat_);
+  y = integrand_p(xlat);
   ftilde = fft(y);
   ftilde(1) = 0;  % ftilde = \mV^H(\vf - m \vone)
   if dim==1
-    hFigIntegrand = figure; scatter(xlat_, y, 10)
+    hFigIntegrand = figure; scatter(xlat, y, 10)
     title(sprintf('%s_n-%d_Tx-%s', ...
       fName, npts, ptransform), 'interpreter','none')
     saveas(hFigIntegrand, sprintf('%s_n-%d_Tx-%s.png', ...
       fName, npts, ptransform))
   end
   
-  lnTheta_MLE = fminbnd(@(lna) ...
-    ObjectiveFunction(exp(lna),xlat_,(ftilde)), ...
-    -15,15,optimset('TolX',1e-2));
-  thetaOpt1 = exp(lnTheta_MLE)
+%   lnTheta_MLE = fminbnd(@(lna) ...
+%     ObjectiveFunction(exp(lna),xlat_,(ftilde)), ...
+%     -15,15,optimset('TolX',1e-2));
+%   thetaOpt1 = exp(lnTheta_MLE)
   
   lnaMLE_opt = fminsearch(@(lna) ...
-    ObjectiveFunction(exp(lna),xlat_,(ftilde)), ...
+    ObjectiveFunction(exp(lna),xlat,(ftilde)), ...
     0,optimset('TolX',1e-2));
   thetaOpt = exp(lnaMLE_opt)
   
   % thetaOpt = 1;  %0.9;
   % ftilde = real(ftilde);
+ 
   
-  
-  
-  lambda1 = kernel(r, xlat_, thetaOpt);
-  lambda = kernel2(r, xlat_, thetaOpt);
+  % lambda1 = kernel(r, xlat_, thetaOpt);
+  vlambda = kernel2(r, xlat, thetaOpt);
   
   % apply transform
   % $\vZ = \frac 1n \mV \mLambda^{-\frac 12} \mV^H(\vf - m \vone)$
   % ifft also includes 1/n division
-  temp1 = ifft(ftilde./sqrt(lambda));
-  w_ftilde = real(temp1);
+  vz = ifft(ftilde./sqrt(vlambda));
+  vz_real = real(vz);  % vz must be real as intended by the transformation 
   
   % create_plots('normplot')
-  create_plots('qqplot', w_ftilde)
+  create_plots('qqplot', vz_real, fName, npts, ptransform, r, thetaOpt)
   
   % Shapiro-Wilk test
   %   [H, pValue, W] = swtest(w_ftilde);
@@ -85,22 +83,22 @@ end
 
 end
 
-function create_plots(type,w_ftilde)
+function create_plots(type, vz_real, fName, npts, ptransform, r, thetaOpt)
 hFigNormplot = figure();
 set(hFigNormplot,'defaultaxesfontsize',16, ...
   'defaulttextfontsize',16, ... %make font larger
   'defaultLineLineWidth',0.75, 'defaultLineMarkerSize',8)
 if strcmp(type, 'normplot')
-  normplot(w_ftilde)
+  normplot(vz_real)
 else
-  qqplot(w_ftilde); hold on
+  qqplot(vz_real); hold on
   plot([-3 3], [-3 3],'-')
 end
 
-%     title(sprintf('%s n=%d Tx=%s r=%1.2f theta=%1.2f', ...
-%       fName, npts, ptransform, r, thetaOpt))
-%     saveas(hFigNormplot, sprintf('%s_%s_n-%d_Tx-%s_r-%d.png', ...
-%       type, fName, npts, ptransform, r))
+title(sprintf('%s n=%d Tx=%s r=%1.2f theta=%1.2f', ...
+       fName, npts, ptransform, r, thetaOpt))
+saveas(hFigNormplot, sprintf('%s_%s_n-%d_Tx-%s_r-%d.png', ...
+       type, fName, npts, ptransform, r))
 end
 
 % gaussian random function
@@ -143,7 +141,7 @@ Lambda = real(fft(C1));
 
 end
 
-function Lambda = kernel2(r, xun, theta)
+function vlambda = kernel2(r, xun, theta)
 constMult = 1/2;
 kernelFunc = @(x) truncated_series_kernel(x,r);
         
@@ -152,7 +150,7 @@ C1 = prod(1 + temp_, 2);
 
 % matlab's builtin fft is much faster and accurate
 % eigenvalues must be real : Symmetric pos definite Kernel
-Lambda = real(fft(C1));
+vlambda = real(fft(C1));
 end
 
 function g = truncated_series(N, r)
