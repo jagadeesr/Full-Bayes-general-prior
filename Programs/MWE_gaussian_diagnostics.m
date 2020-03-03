@@ -17,52 +17,53 @@ rVec = [2 4];
 
 for r=rVec
   
-%parameters for random function
-rfun = r/2;  %1;
-A = 3;
-
-
-shift = rand(1,dim);
-
-[~,xlat_] = simple_lattice_gen(npts,dim,shift,true);
-
-if strcmp(fName,'ExpCos')
-  integrand = @(x) exp(sum(cos(2*pi*x), 2));
-elseif strcmp(fName, 'Keister')
-  integrand = @(x) keisterFunc(x,dim,1/sqrt(2)); % a=0.8
-else
-  integrand = @(x) f_rand(x,rfun,A);
-end
-
-integrand_p = doPeriodTx(integrand, ptransform);
-
-y = integrand_p(xlat_);
-ftilde = fft(y);
-ftilde(1) = 0;  % ftilde = \mV^H(\vf - m \vone)
-if dim==1
-  hFigIntegrand = figure; scatter(xlat_, y, 10)
-  title(sprintf('%s_n-%d_Tx-%s', ...
-    fName, npts, ptransform), 'interpreter','none')
-  saveas(hFigIntegrand, sprintf('%s_n-%d_Tx-%s.png', ...
-    fName, npts, ptransform))
-end
-
-lnTheta_MLE = fminbnd(@(lna) ...
-  ObjectiveFunction(exp(lna),xlat_,(ftilde)), ...
-  -15,15,optimset('TolX',1e-2));
-thetaOpt = exp(lnTheta_MLE);
-
-lnaMLE_opt = fminsearch(@(lna) ...
-  ObjectiveFunction(exp(lna),xlat_,(ftilde)), ...
-  0,optimset('TolX',1e-2));
-thetaOpt = exp(lnaMLE_opt);
-
-% thetaOpt = 1;  %0.9;
-% ftilde = real(ftilde);
-
-
+  %parameters for random function
+  rfun = r/2;  %1;
+  A = 3;
   
-  lambda = kernel(r, xlat_, thetaOpt);
+  
+  shift = rand(1,dim);
+  
+  [~,xlat_] = simple_lattice_gen(npts,dim,shift,true);
+  
+  if strcmp(fName,'ExpCos')
+    integrand = @(x) exp(sum(cos(2*pi*x), 2));
+  elseif strcmp(fName, 'Keister')
+    integrand = @(x) keisterFunc(x,dim,1/sqrt(2)); % a=0.8
+  else
+    integrand = @(x) f_rand(x,rfun,A);
+  end
+  
+  integrand_p = doPeriodTx(integrand, ptransform);
+  
+  y = integrand_p(xlat_);
+  ftilde = fft(y);
+  ftilde(1) = 0;  % ftilde = \mV^H(\vf - m \vone)
+  if dim==1
+    hFigIntegrand = figure; scatter(xlat_, y, 10)
+    title(sprintf('%s_n-%d_Tx-%s', ...
+      fName, npts, ptransform), 'interpreter','none')
+    saveas(hFigIntegrand, sprintf('%s_n-%d_Tx-%s.png', ...
+      fName, npts, ptransform))
+  end
+  
+  lnTheta_MLE = fminbnd(@(lna) ...
+    ObjectiveFunction(exp(lna),xlat_,(ftilde)), ...
+    -15,15,optimset('TolX',1e-2));
+  thetaOpt1 = exp(lnTheta_MLE)
+  
+  lnaMLE_opt = fminsearch(@(lna) ...
+    ObjectiveFunction(exp(lna),xlat_,(ftilde)), ...
+    0,optimset('TolX',1e-2));
+  thetaOpt = exp(lnaMLE_opt)
+  
+  % thetaOpt = 1;  %0.9;
+  % ftilde = real(ftilde);
+  
+  
+  
+  lambda1 = kernel(r, xlat_, thetaOpt);
+  lambda = kernel2(r, xlat_, thetaOpt);
   
   % apply transform
   % $\vZ = \frac 1n \mV \mLambda^{-\frac 12} \mV^H(\vf - m \vone)$
@@ -104,24 +105,26 @@ end
 
 % gaussian random function
 function fval = f_rand(xpts, rfun, A)
-theta = sqrt(2 * factorial(2*rfun))/((2*pi)^rfun);
+% a = sqrt(2 * factorial(2*rfun))/((2*pi)^rfun);
 % theta = (2 * factorial(rfun))/((2*pi)^rfun);
+a = 1;
 
 rng(202326) % initialize random number generator for reproducability
 N = 2^(15);
-f_c = randn(1, N);
-f_s = randn(1, N);
+f_c = a*randn(1, N);
+f_s = a*randn(1, N);
 f_0 = randn(1, 1) + A;
 kvec = (1:N);
 argx = @(x) 2*pi*x*kvec;
 f_c_ = @(x)(f_c./kvec.^(rfun)).*cos(argx(x));
 f_s_ = @(x)(f_s./kvec.^(rfun)).*sin(argx(x));
-f_ran = @(x,theta) f_0 + theta * sum(f_c_(x)+ f_s_(x),2) ; %
-fval = f_ran(xpts,theta);
+f_ran = @(x) f_0 + sum(f_c_(x)+ f_s_(x),2) ; %
+fval = f_ran(xpts);
+% figure; plot(fval, '.')
 end
 
 function Lambda = kernel(r, xun, theta)
-constMult = 1;  % -(-1)^(r/2)*((2*pi)^r)/factorial(r);
+constMult =  -(-1)^(r/2)*((2*pi)^r)/(2*factorial(r));
 if r == 2
   bernPoly = @(x)(-x.*(1-x) + 1/6);
 elseif r == 4
@@ -129,7 +132,7 @@ elseif r == 4
 else
   error('Bernoulli order=%d not implemented !', r);
 end
-kernelFunc = @(x) -(-1).^(r/2)*bernPoly(x);
+kernelFunc = @(x) bernPoly(x);
 
 temp_ = bsxfun(@times, (theta)*constMult, kernelFunc(xun));
 C1 = prod(1 + temp_, 2);
@@ -140,6 +143,34 @@ Lambda = real(fft(C1));
 
 end
 
+function Lambda = kernel2(r, xun, theta)
+constMult = 1/2;
+kernelFunc = @(x) truncated_series_kernel(x,r);
+        
+temp_ = bsxfun(@times, (theta)*constMult, kernelFunc(xun));
+C1 = prod(1 + temp_, 2);
+
+% matlab's builtin fft is much faster and accurate
+% eigenvalues must be real : Symmetric pos definite Kernel
+Lambda = real(fft(C1));
+end
+
+function g = truncated_series(N, r)
+tilde_g_0 = 0;
+m = 1:(-1 + N/2);
+tilde_g_h1 = N./abs(m).^(r);
+m = (N/2):(-1 + N);
+tilde_g_h2 = N./abs(N-m).^(r);
+tilde_g = [tilde_g_0 tilde_g_h1 tilde_g_h2];
+g = ifft(tilde_g)';
+end
+
+function c = truncated_series_kernel(x,r)
+n = size(x, 1);
+g = truncated_series(n,r);
+c = g(1 + x*n);
+end
+
 function [loss,Lambda,RKHSnorm] = ObjectiveFunction(theta,xun,ftilde)
 
 n = length(ftilde);
@@ -148,7 +179,7 @@ n = length(ftilde);
 arbMean = true;
 order = 4;
 [Lambda] = kernel(order, xun, theta);
-      
+
 % compute RKHSnorm
 temp = abs(ftilde(Lambda~=0).^2)./(Lambda(Lambda~=0)) ;
 
