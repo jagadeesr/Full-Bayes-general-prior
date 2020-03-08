@@ -13,13 +13,15 @@ ptransform = ptransforms{3};
 
 npts = 2^8;  % max 14
 dim = 1;
-rVec = [1.15 1.75 2.45];
+rVec = [1.75 2.45 3.15];
 
 for r=rVec
   
   %parameters for random function
   rfun = r/2;
-  A = 3;
+  f_mean = 3;
+  f_std_a = 8;
+  f_std_b = 5;
   
   shift = rand(1,dim);
   
@@ -30,7 +32,7 @@ for r=rVec
   elseif strcmp(fName, 'Keister')
     integrand = @(x) keisterFunc(x,dim,1/sqrt(2)); % a=0.8
   else
-    integrand = @(x) f_rand(x,rfun,A);
+    integrand = @(x) f_rand(x,rfun,f_mean,f_std_a,f_std_b);
   end
   
   integrand_p = doPeriodTx(integrand, ptransform);
@@ -50,27 +52,49 @@ for r=rVec
 %     ObjectiveFunction(exp(lna),xlat_,(ftilde)), ...
 %     -15,15,optimset('TolX',1e-2));
 %   thetaOpt1 = exp(lnTheta_MLE)
+
+  % theta0 = [0.1,0.1];
+  % [aOPT, fval, exitflag, output] = fminsearch(fLoss, ...
+  %   theta0,optimset('TolX',1e-2));
+
+%   options = optimset('TolX',1e-2, 'PlotFcns',@optimplotfval);
+%   fLoss = @(param)ObjectiveFunctionFmin(obj,exp(param(1)),...
+%     1 + exp(param(2)),xpts,ftilde);
   
-  lnaMLE_opt = fminsearch(@(lna) ...
-    ObjectiveFunction(exp(lna),xlat,(ftilde)), ...
-    0,optimset('TolX',1e-2));
-  thetaOpt = exp(lnaMLE_opt)
-  
-  % thetaOpt = 1;  %0.9;
-  % ftilde = real(ftilde);
- 
+  if 0
+    lnaMLE_opt = fminsearch(@(lna) ...
+      ObjectiveFunction(exp(lna),r,xlat,(ftilde)), ...
+      0,optimset('TolX',1e-2));
+    thetaOpt = exp(lnaMLE_opt)
+  else
+    if 0
+      thetaOpt = 1;
+      ln_rOpt = fminsearch(@(lnr) ...
+        ObjectiveFunction(thetaOpt,1+exp(lnr),xlat,(ftilde)), ...
+        0,optimset('TolX',1e-2));
+      rOpt = 1 + exp(ln_rOpt)
+      r = rOpt;
+    else
+      lnParamsOpt = fminsearch(@(lnParams) ...
+        ObjectiveFunction(exp(lnParams(1)),1+exp(lnParams(2)),xlat,(ftilde)), ...
+        [0,0],optimset('TolX',1e-2));
+      thetaOpt = exp(lnParamsOpt(1));
+      rOpt = 1 + exp(lnParamsOpt(2));
+    end
+  end
   
   % lambda1 = kernel(r, xlat_, thetaOpt);
-  vlambda = kernel2(r, xlat, thetaOpt);
+  vlambda = kernel2(rOpt, xlat, thetaOpt);
   
   % apply transform
   % $\vZ = \frac 1n \mV \mLambda^{-\frac 12} \mV^H(\vf - m \vone)$
   % ifft also includes 1/n division
   vz = ifft(ftilde./sqrt(vlambda));
   vz_real = real(vz);  % vz must be real as intended by the transformation 
-  
+  s = sqrt(sum(abs(ftilde(2:end).^2)./vlambda(2:end))/(npts^2));
+
   % create_plots('normplot')
-  create_plots('qqplot', vz_real, fName, npts, ptransform, r, thetaOpt)
+  create_plots('qqplot', vz_real/s, fName, npts, ptransform, rOpt, thetaOpt)
   
   % Shapiro-Wilk test
   %   [H, pValue, W] = swtest(w_ftilde);
@@ -102,16 +126,17 @@ saveas(hFigNormplot, sprintf('%s_%s_n-%d_Tx-%s_r-%d.png', ...
 end
 
 % gaussian random function
-function fval = f_rand(xpts, rfun, A)
+function fval = f_rand(xpts, rfun, a, b, c)
 % a = sqrt(2 * factorial(2*rfun))/((2*pi)^rfun);
 % theta = (2 * factorial(rfun))/((2*pi)^rfun);
-a = 1;
+% a = 8;
+% b = 5;
 
 rng(202326) % initialize random number generator for reproducability
 N = 2^(15);
 f_c = a*randn(1, N);
 f_s = a*randn(1, N);
-f_0 = randn(1, 1) + A;
+f_0 = b*randn(1, 1) + c;
 kvec = (1:N);
 argx = @(x) 2*pi*x*kvec;
 f_c_ = @(x)(f_c./kvec.^(rfun)).*cos(argx(x));
@@ -169,14 +194,13 @@ g = truncated_series(n,r);
 c = g(1 + x*n);
 end
 
-function [loss,Lambda,RKHSnorm] = ObjectiveFunction(theta,xun,ftilde)
+function [loss,Lambda,RKHSnorm] = ObjectiveFunction(theta,order,xun,ftilde)
 
 n = length(ftilde);
 % [Lambda, Lambda_ring] = kernel(xun,obj.kernType,a,obj.order,...
 %   obj.avoidCancelError);
 arbMean = true;
-order = 4;
-[Lambda] = kernel(order, xun, theta);
+[Lambda] = kernel2(order, xun, theta);
 
 % compute RKHSnorm
 temp = abs(ftilde(Lambda~=0).^2)./(Lambda(Lambda~=0)) ;
@@ -194,7 +218,7 @@ end
 loss1 = sum(log(Lambda(Lambda~=0)))/n;
 loss2 = log(temp_1);
 loss = (loss1 + loss2);
-fprintf('loss1 %1.3f loss2 %1.3f loss %1.3f a %1.3e\n', loss1, loss2, loss, theta)
+fprintf('loss1 %1.3f loss2 %1.3f loss %1.3f r %1.3ea %1.3e\n', loss1, loss2, loss, order, theta)
 
 end
 
