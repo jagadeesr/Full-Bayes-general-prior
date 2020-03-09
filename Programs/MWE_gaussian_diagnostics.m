@@ -44,36 +44,23 @@ for r=rVec
     hFigIntegrand = figure; scatter(xlat, y, 10)
     title(sprintf('%s_n-%d_Tx-%s', ...
       fName, npts, ptransform), 'interpreter','none')
-    saveas(hFigIntegrand, sprintf('%s_n-%d_Tx-%s.png', ...
-      fName, npts, ptransform))
+    saveas(hFigIntegrand, sprintf('%s_n-%d_Tx-%s_rFun-%1.2f.png', ...
+      fName, npts, ptransform, rfun))
   end
   
-%   lnTheta_MLE = fminbnd(@(lna) ...
-%     ObjectiveFunction(exp(lna),xlat_,(ftilde)), ...
-%     -15,15,optimset('TolX',1e-2));
-%   thetaOpt1 = exp(lnTheta_MLE)
-
-  % theta0 = [0.1,0.1];
-  % [aOPT, fval, exitflag, output] = fminsearch(fLoss, ...
-  %   theta0,optimset('TolX',1e-2));
-
-%   options = optimset('TolX',1e-2, 'PlotFcns',@optimplotfval);
-%   fLoss = @(param)ObjectiveFunctionFmin(obj,exp(param(1)),...
-%     1 + exp(param(2)),xpts,ftilde);
-  
   if 0
-    lnaMLE_opt = fminsearch(@(lna) ...
-      ObjectiveFunction(exp(lna),r,xlat,(ftilde)), ...
-      0,optimset('TolX',1e-2));
-    thetaOpt = exp(lnaMLE_opt)
+%     lnaMLE_opt = fminsearch(@(lna) ...
+%       ObjectiveFunction(exp(lna),r,xlat,(ftilde)), ...
+%       0,optimset('TolX',1e-2));
+%     thetaOpt = exp(lnaMLE_opt)
   else
     if 0
-      thetaOpt = 1;
-      ln_rOpt = fminsearch(@(lnr) ...
-        ObjectiveFunction(thetaOpt,1+exp(lnr),xlat,(ftilde)), ...
-        0,optimset('TolX',1e-2));
-      rOpt = 1 + exp(ln_rOpt)
-      r = rOpt;
+%       thetaOpt = 1;
+%       ln_rOpt = fminsearch(@(lnr) ...
+%         ObjectiveFunction(thetaOpt,1+exp(lnr),xlat,(ftilde)), ...
+%         0,optimset('TolX',1e-2));
+%       rOpt = 1 + exp(ln_rOpt)
+%       r = rOpt;
     else
       lnParamsOpt = fminsearch(@(lnParams) ...
         ObjectiveFunction(exp(lnParams(1)),1+exp(lnParams(2)),xlat,(ftilde)), ...
@@ -85,16 +72,17 @@ for r=rVec
   
   % lambda1 = kernel(r, xlat_, thetaOpt);
   vlambda = kernel2(rOpt, xlat, thetaOpt);
-  
+  s = sqrt(sum(abs(ftilde(2:end).^2)./vlambda(2:end))/(npts^2));
+  vlambda = (s^2)*vlambda;
+
   % apply transform
   % $\vZ = \frac 1n \mV \mLambda^{-\frac 12} \mV^H(\vf - m \vone)$
   % ifft also includes 1/n division
   vz = ifft(ftilde./sqrt(vlambda));
   vz_real = real(vz);  % vz must be real as intended by the transformation 
-  s = sqrt(sum(abs(ftilde(2:end).^2)./vlambda(2:end))/(npts^2));
 
   % create_plots('normplot')
-  create_plots('qqplot', vz_real/s, fName, npts, ptransform, rOpt, thetaOpt)
+  create_plots('qqplot', vz_real, fName, npts, ptransform, rOpt, thetaOpt)
   
   % Shapiro-Wilk test
   %   [H, pValue, W] = swtest(w_ftilde);
@@ -121,7 +109,7 @@ end
 
 title(sprintf('%s n=%d Tx=%s r=%1.2f theta=%1.2f', ...
        fName, npts, ptransform, r, thetaOpt))
-saveas(hFigNormplot, sprintf('%s_%s_n-%d_Tx-%s_r-%d.png', ...
+saveas(hFigNormplot, sprintf('%s_%s_n-%d_Tx-%s_rOpt-%1.3f.png', ...
        type, fName, npts, ptransform, r))
 end
 
