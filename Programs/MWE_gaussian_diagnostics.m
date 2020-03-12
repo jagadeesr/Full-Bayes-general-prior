@@ -11,10 +11,10 @@ ptransforms = {'C1','C1sin', 'none'};
 fName = fNames{3};
 ptransform = ptransforms{3};
 
-npts = 2^8;  % max 14
+npts = 2^4;  % max 14
 dim = 1;
-rVec = [1.75 2.45 3.15];
-
+rVec = [1.75 2.45 3.15]; %vector of possible r values
+theta = 5;
 for r=rVec
   
   %parameters for random function
@@ -31,15 +31,17 @@ for r=rVec
     integrand = @(x) exp(sum(cos(2*pi*x), 2));
   elseif strcmp(fName, 'Keister')
     integrand = @(x) keisterFunc(x,dim,1/sqrt(2)); % a=0.8
+  elseif strcmp(fName, 'rand')
+    integrand = @(x) f_rand(x,rfun,theta, f_mean,f_std_a,f_std_b);
   else
-    integrand = @(x) f_rand(x,rfun,f_mean,f_std_a,f_std_b);
+    error('Invalid function name')
   end
   
   integrand_p = doPeriodTx(integrand, ptransform);
   
-  y = integrand_p(xlat);
-  ftilde = fft(y);
-  ftilde(1) = 0;  % ftilde = \mV^H(\vf - m \vone)
+  y = integrand_p(xlat); %function data
+  ftilde = fft(y); %fourier coefficients
+  ftilde(1) = 0;  % ftilde = \mV^H(\vf - m \vone), subtract mean
   if dim==1
     hFigIntegrand = figure; scatter(xlat, y, 10)
     title(sprintf('%s_n-%d_Tx-%s', ...
@@ -61,7 +63,7 @@ for r=rVec
 %         0,optimset('TolX',1e-2));
 %       rOpt = 1 + exp(ln_rOpt)
 %       r = rOpt;
-    else
+    else %search for optimal kernel parameters
       lnParamsOpt = fminsearch(@(lnParams) ...
         ObjectiveFunction(exp(lnParams(1)),1+exp(lnParams(2)),xlat,(ftilde)), ...
         [0,0],optimset('TolX',1e-2));
@@ -82,7 +84,7 @@ for r=rVec
   vz_real = real(vz);  % vz must be real as intended by the transformation 
 
   % create_plots('normplot')
-  create_plots('qqplot', vz_real, fName, npts, ptransform, rOpt, thetaOpt)
+  create_plots('qqplot', vz_real, fName, npts, ptransform, r, rOpt, theta, thetaOpt)
   
   % Shapiro-Wilk test
   %   [H, pValue, W] = swtest(w_ftilde);
@@ -95,7 +97,7 @@ end
 
 end
 
-function create_plots(type, vz_real, fName, npts, ptransform, r, thetaOpt)
+function create_plots(type, vz_real, fName, npts, ptransform, r, rOpt, theta, thetaOpt)
 hFigNormplot = figure();
 set(hFigNormplot,'defaultaxesfontsize',16, ...
   'defaulttextfontsize',16, ... %make font larger
@@ -107,14 +109,14 @@ else
   plot([-3 3], [-3 3],'-')
 end
 
-title(sprintf('%s n=%d Tx=%s r=%1.2f theta=%1.2f', ...
-       fName, npts, ptransform, r, thetaOpt))
+title(sprintf('%s n=%d Tx=%s r=%1.2f rOpt=%1.2f, theta=%1.2f, thetaOpt=%1.2f', ...
+       fName, npts, ptransform, r, rOpt, theta, thetaOpt))
 saveas(hFigNormplot, sprintf('%s_%s_n-%d_Tx-%s_rOpt-%1.3f.png', ...
        type, fName, npts, ptransform, r))
 end
 
 % gaussian random function
-function fval = f_rand(xpts, rfun, a, b, c)
+function fval = f_rand(xpts, rfun, theta, a, b, c)
 % a = sqrt(2 * factorial(2*rfun))/((2*pi)^rfun);
 % theta = (2 * factorial(rfun))/((2*pi)^rfun);
 % a = 8;
@@ -129,7 +131,7 @@ kvec = (1:N);
 argx = @(x) 2*pi*x*kvec;
 f_c_ = @(x)(f_c./kvec.^(rfun)).*cos(argx(x));
 f_s_ = @(x)(f_s./kvec.^(rfun)).*sin(argx(x));
-f_ran = @(x) f_0 + sum(f_c_(x)+ f_s_(x),2) ; %
+f_ran = @(x) f_0 + sqrt(theta)*sum(f_c_(x)+ f_s_(x),2) ; %
 fval = f_ran(xpts);
 % figure; plot(fval, '.')
 end
