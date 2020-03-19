@@ -11,7 +11,7 @@ ptransforms = {'C1','C1sin', 'none'};
 fName = fNames{3};
 ptransform = ptransforms{3};
 
-npts = 2^4;  % max 14
+npts = 2^8;  % max 14
 dim = 1;
 rVec = [1.75 2.45 3.15]; %vector of possible r values
 theta = 5;
@@ -50,27 +50,27 @@ for r=rVec
       fName, npts, ptransform, rfun))
   end
   
-  if 0
+%   if 0
 %     lnaMLE_opt = fminsearch(@(lna) ...
 %       ObjectiveFunction(exp(lna),r,xlat,(ftilde)), ...
 %       0,optimset('TolX',1e-2));
 %     thetaOpt = exp(lnaMLE_opt)
-  else
-    if 0
+%   else
+%     if 0
 %       thetaOpt = 1;
 %       ln_rOpt = fminsearch(@(lnr) ...
 %         ObjectiveFunction(thetaOpt,1+exp(lnr),xlat,(ftilde)), ...
 %         0,optimset('TolX',1e-2));
 %       rOpt = 1 + exp(ln_rOpt)
 %       r = rOpt;
-    else %search for optimal kernel parameters
+%     else %search for optimal kernel parameters
       lnParamsOpt = fminsearch(@(lnParams) ...
         ObjectiveFunction(exp(lnParams(1)),1+exp(lnParams(2)),xlat,(ftilde)), ...
         [0,0],optimset('TolX',1e-2));
       thetaOpt = exp(lnParamsOpt(1));
       rOpt = 1 + exp(lnParamsOpt(2));
-    end
-  end
+%     end
+%   end
   
   % lambda1 = kernel(r, xlat_, thetaOpt);
   vlambda = kernel2(rOpt, xlat, thetaOpt);
@@ -93,6 +93,10 @@ for r=rVec
   %     Hval='false';
   %   end
   %   fprintf('Shapiro-Wilk test: Normal=%s, pValue=%1.3f, W=%1.3f\n', Hval, pValue, W);
+  fprintf('r = %7.5f, rOpt = %7.5f, theta = %7.5f, thetaOpt = %7.5f\n', ...
+     r,rOpt,theta,thetaOpt);
+  
+
 end
 
 end
