@@ -32,7 +32,7 @@ for r=rVec
   elseif strcmp(fName, 'Keister')
     integrand = @(x) keisterFunc(x,dim,1/sqrt(2)); % a=0.8
   elseif strcmp(fName, 'rand')
-    integrand = @(x) f_rand(x,rfun,theta, f_mean,f_std_a,f_std_b);
+    integrand = @(x) f_rand(x, rfun, theta, f_std_a, f_std_b, f_mean);
   else
     error('Invalid function name')
   end
@@ -113,8 +113,8 @@ else
   plot([-3 3], [-3 3],'-')
 end
 
-title(sprintf('%s n=%d Tx=%s r=%1.2f rOpt=%1.2f, theta=%1.2f, thetaOpt=%1.2f', ...
-       fName, npts, ptransform, r, rOpt, theta, thetaOpt))
+title(sprintf('%s r=%1.2f rOpt=%1.2f, theta=%1.2f, thetaOpt=%1.2f', ...
+       fName, r, rOpt, theta, thetaOpt))
 saveas(hFigNormplot, sprintf('%s_%s_n-%d_Tx-%s_rOpt-%1.3f.png', ...
        type, fName, npts, ptransform, r))
 end
@@ -130,7 +130,7 @@ rng(202326) % initialize random number generator for reproducability
 N = 2^(15);
 f_c = a*randn(1, N);
 f_s = a*randn(1, N);
-f_0 = b*randn(1, 1) + c;
+f_0 = c + b*randn(1, 1);
 kvec = (1:N);
 argx = @(x) 2*pi*x*kvec;
 f_c_ = @(x)(f_c./kvec.^(rfun)).*cos(argx(x));
@@ -212,7 +212,7 @@ end
 loss1 = sum(log(Lambda(Lambda~=0)))/n;
 loss2 = log(temp_1);
 loss = (loss1 + loss2);
-fprintf('loss1 %1.3f loss2 %1.3f loss %1.3f r %1.3ea %1.3e\n', loss1, loss2, loss, order, theta)
+fprintf('L1 %1.3f L2 %1.3f L %1.3f r %1.3e theta %1.3e\n', loss1, loss2, loss, order, theta)
 
 end
 

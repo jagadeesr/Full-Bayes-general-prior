@@ -619,7 +619,7 @@ Our motivation to experiment with the general prior was to show that it may be p
 
 \section{Diagnostics for the Gaussian Process Assumption}
 
-The starting point for our Bayesian cubature is the assumption that the integrand arises from a Gaussian process. This means that the function data, $\vf$, satisfy a multivariate Gaussian distribution, as in \eqref{eqn:fGaussDist}.  The transformed data, $\vZ = \frac 1n \mV \mLambda^{-\frac 12} \mV^H(\vf - m \vone)$, has zero mean and is also uncorrelated because
+The starting point for our Bayesian cubature is the assumption that the integrand arises from a Gaussian process. This means that the function data, $\vf$, shall satisfy a multivariate Gaussian distribution, as in \eqref{eqn:fGaussDist}. We propose a transform, $\vZ = \frac 1n \mV \mLambda^{-\frac 12} \mV^H(\vf - m \vone)$, to the given function data $\vf$ to verify the assumption.  We can verify that the transformed data, $\vZ$, has zero mean and is also uncorrelated because
 \begin{align*}
 \Ex\left[\vZ \right] &= 
 \frac 1n \mV \mLambda^{-\frac 12} \mV^H(\Ex\left[\vf\right] - m \vone) 
@@ -655,7 +655,28 @@ In practice, using the estimated $m_\MLE$ further simplifies,
 &= \frac 1n \mV \mLambda^{-\frac 12} \left(\mV^H \vf - \tilde{f}_1 \begin{pmatrix}1, 0, \hdots, 0 \end{pmatrix}^T \right) 
 \end{align*}
 
-Figures \ref{fig:mvn-normplot} and \ref{fig:keister-normplot} are normal probability plots of the $Z_i$ using empirical Bayes estimates of $m$ and $\vtheta$. \textbf{more goes here}.
+
+To verify this hypothesis, we build a toy function using the known Bernoulli polynomial series,
+\begin{align*}
+f_{\theta, r}(x) = \hat{f}_0 + \sqrt{\theta} \sum_{k \neq 0}^N 
+\frac{f_{c,k} \cos(2\pi k x) + f_{s,k} \sin(2\pi k x)}{k^r}
+\end{align*}
+where $f_0 \sim \text{IID} \calN(c, b^2) $, $f_{c,k}, f_{s,k} \sim \text{IID} \calN(0, a^2)$ and $a, b, c$ are constants. The series is truncated to an arbitrarily chosen length $N$. It has zero mean and covariance
+\begin{align*}
+\cov(f) &= \Ex[f(x) f(t)] \\
+&= \cov(f_0) + \theta \sum_{k=1}^N 
+\left(	
+\Ex(f_{c,k}^2) \frac{\cos(2\pi k x) \cos(2\pi k t)}{k^{2r}} +
+\Ex(f_{s,k}^2) \frac{\sin(2\pi k x) \sin(2\pi k t)}{k^{2r}} \right) \\
+&= b^2 + a^2 \theta \sum_{k=1}^N 	
+\frac{\cos(2\pi k (x - t)) }{k^{2r}} 
+\end{align*}
+
+
+
+Figures \ref{fig:keister-normplot} and \ref{fig:mvn-normplot} are normal probability plots of the $Z_i$ using empirical Bayes estimates of $m$ and $\vtheta$. \textbf{more goes here}.
+
+
 
 
 \iftrue
@@ -673,21 +694,18 @@ Figures \ref{fig:mvn-normplot} and \ref{fig:keister-normplot} are normal probabi
 	\label{fig:mvn-normplot}
 \end{figure}
 \fi
-To verify this result, we build a toy function using the known Bernoulli polynomial series,
-\begin{align*}
-f(x) = \hat{f}_0 + \sqrt{\theta} \sum_{k \neq 0}^N 
-\frac{f_{kR} \cos(2\pi k x) + f_{kI} \sin(2\pi k x)}{k}
-\end{align*}
-where $f_0, f_{kR}, f_{kI} \sim \text{IID} \calN(0, 1) $ and the series is truncated to length $N$ for computability. It has zero mean and covariance
-\begin{align*}
-\cov(f) &= \Ex[f(x) f(t)] \\
-&= \cov(f_0) + \theta \sum_{k=1}^N 
-\left(	
-\Ex(f_{kR}^2) \frac{\cos(2\pi k x) \cos(2\pi k t)}{k^2} +
-\Ex(f_{kI}^2) \frac{\sin(2\pi k x) \sin(2\pi k t)}{k^2} \right) \\
-&= 1 + \theta \sum_{k=1}^N 	
-\frac{\cos(2\pi k (x - t)) }{k^2} 
-\end{align*}
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
