@@ -11,17 +11,21 @@ ptransforms = {'C1','C1sin', 'none'};
 fName = fNames{3};
 ptransform = ptransforms{3};
 
-npts = 2^8;  % max 14
-dim = 1;
-rVec = [1.75 2.45 3.15]; %vector of possible r values
-theta = 5;
+npts = 2^7;  % max 14
+dim = 3;
+rVec = 1.75;
+%rVec = [1.75 2.45 3.15]; %vector of possible r values
+
 for r=rVec
   
   %parameters for random function
+  %seed = 202326;
+  seed = randi([1,1e6],1,1)
   rfun = r/2;
-  f_mean = 3;
-  f_std_a = 8;
-  f_std_b = 5;
+  f_mean = 0;
+  f_std_a = 0.5;
+  f_std_b = 1;
+  theta = (f_std_a/f_std_b)^2;
   
   shift = rand(1,dim);
   
@@ -32,7 +36,7 @@ for r=rVec
   elseif strcmp(fName, 'Keister')
     integrand = @(x) keisterFunc(x,dim,1/sqrt(2)); % a=0.8
   elseif strcmp(fName, 'rand')
-    integrand = @(x) f_rand(x, rfun, theta, f_std_a, f_std_b, f_mean);
+    integrand = @(x) f_rand(x, rfun, f_std_a, f_std_b, f_mean, seed);
   else
     error('Invalid function name')
   end
@@ -64,16 +68,40 @@ for r=rVec
 %       rOpt = 1 + exp(ln_rOpt)
 %       r = rOpt;
 %     else %search for optimal kernel parameters
-      lnParamsOpt = fminsearch(@(lnParams) ...
-        ObjectiveFunction(exp(lnParams(1)),1+exp(lnParams(2)),xlat,(ftilde)), ...
-        [0,0],optimset('TolX',1e-2));
+      objfun = @(lnParams) ...
+        ObjectiveFunction(exp(lnParams(1)),1+exp(lnParams(2)),xlat,(ftilde));
+      %% Plot the objective function
+      lnthetarange = (-1:0.2:2);
+      lnorderrange = (-1:0.1:1);
+      [lnthth,lnordord] = meshgrid(lnthetarange,lnorderrange);
+      objobj = lnthth;
+      for ii =  1:size(lnthth,1)
+         for jj = 1:size(lnthth,2)
+            objobj(ii,jj) = objfun([lnthth(ii,jj); lnordord(ii,jj)]);
+         end
+      end
+      figure
+      surf(lnthth,lnordord,objobj)
+      xlabel('ln(theta)')
+      ylabel('ln(order-1)')
+      
+      [~,which] = min(objobj,[],'all','linear');
+      [whichrow,whichcol] = ind2sub(size(lnthth),which);
+      lnthOptAppx = lnthth(whichrow,whichcol);
+      thetaOptAppx = exp(lnthOptAppx)
+      lnordOptAppx = lnordord(whichrow,whichcol);
+      orderOptAppx = 1+exp(lnordOptAppx)
+
+      
+      %% Optimize the objective function
+      lnParamsOpt = fminsearch(objfun,[lnthOptAppx;lnordOptAppx],optimset('TolX',1e-3));
       thetaOpt = exp(lnParamsOpt(1));
       rOpt = 1 + exp(lnParamsOpt(2));
 %     end
 %   end
   
   % lambda1 = kernel(r, xlat_, thetaOpt);
-  vlambda = kernel2(rOpt, xlat, thetaOpt);
+  vlambda = kernel2(thetaOpt, rOpt, xlat);
   s = sqrt(sum(abs(ftilde(2:end).^2)./vlambda(2:end))/(npts^2));
   vlambda = (s^2)*vlambda;
 
@@ -120,27 +148,32 @@ saveas(hFigNormplot, sprintf('%s_%s_n-%d_Tx-%s_rOpt-%1.3f.png', ...
 end
 
 % gaussian random function
-function fval = f_rand(xpts, rfun, theta, a, b, c)
-% a = sqrt(2 * factorial(2*rfun))/((2*pi)^rfun);
-% theta = (2 * factorial(rfun))/((2*pi)^rfun);
-% a = 8;
-% b = 5;
-
-rng(202326) % initialize random number generator for reproducability
-N = 2^(15);
-f_c = a*randn(1, N);
-f_s = a*randn(1, N);
+function fval = f_rand(xpts, rfun, a, b, c, seed)
+dim = size(xpts,2);
+rng(seed) % initialize random number generator for reproducability
+N1 = 2^floor(16/dim);
+Nall = N1^dim;
+kvec(dim,Nall) = 0; %initialize kved
+kvec(1,1:N1) = 0:N1-1; %first dimension
+Nd = N1;
+for d = 2:dim
+   Ndm1 = Nd;
+   Nd = Nd*N1;
+   kvec(1:d,1:Nd) = [repmat(kvec(1:d-1,1:Ndm1),1,N1); ...
+      reshape(repmat(0:N1-1,Ndm1,1),1,Nd)];
+end
+f_c = a*randn(1,Nall-1);
+f_s = a*randn(1,Nall-1);
 f_0 = c + b*randn(1, 1);
-kvec = (1:N);
-argx = @(x) 2*pi*x*kvec;
-f_c_ = @(x)(f_c./kvec.^(rfun)).*cos(argx(x));
-f_s_ = @(x)(f_s./kvec.^(rfun)).*sin(argx(x));
-f_ran = @(x) f_0 + sqrt(theta)*sum(f_c_(x)+ f_s_(x),2) ; %
-fval = f_ran(xpts);
+kbar = prod(max(kvec(:,2:Nall),1),1);
+argx = (2*pi*xpts) * kvec(:,2:Nall);
+f_c_ = (f_c./kbar.^(rfun)).*cos(argx);
+f_s_ = (f_s./kbar.^(rfun)).*sin(argx);
+fval = f_0 + sum(f_c_+ f_s_,2) ;
 % figure; plot(fval, '.')
 end
 
-function Lambda = kernel(r, xun, theta)
+function Lambda = kernel(theta, r, xun)
 constMult =  -(-1)^(r/2)*((2*pi)^r)/(2*factorial(r));
 if r == 2
   bernPoly = @(x)(-x.*(1-x) + 1/6);
@@ -160,44 +193,57 @@ Lambda = real(fft(C1));
 
 end
 
-function vlambda = kernel2(r, xun, theta)
-constMult = 1/2;
-kernelFunc = @(x) truncated_series_kernel(x,r);
-        
-temp_ = bsxfun(@times, (theta)*constMult, kernelFunc(xun));
+function vlambda = kernel2(theta, r, xun)
+n = size(xun, 1);
+m = (1:(-1 + n/2))';
+tilde_g_h1 = m.^(-r);
+tilde_g = [0; tilde_g_h1; 0; tilde_g_h1(end:-1:1)];
+g = fft(tilde_g);
+temp_ = (theta/2)*g(1 + xun*n);
 C1 = prod(1 + temp_, 2);
-
 % matlab's builtin fft is much faster and accurate
 % eigenvalues must be real : Symmetric pos definite Kernel
 vlambda = real(fft(C1));
 end
 
-function g = truncated_series(N, r)
-tilde_g_0 = 0;
-m = 1:(-1 + N/2);
-tilde_g_h1 = N./abs(m).^(r);
-m = (N/2):(-1 + N);
-tilde_g_h2 = N./abs(N-m).^(r);
-tilde_g = [tilde_g_0 tilde_g_h1 tilde_g_h2];
-g = ifft(tilde_g)';
-end
-
-function c = truncated_series_kernel(x,r)
-n = size(x, 1);
-g = truncated_series(n,r);
-c = g(1 + x*n);
-end
+% function vlambda = kernel2(r, xun, theta)
+% constMult = 1/2;
+% kernelFunc = @(x) truncated_series_kernel(x,r);
+%         
+% temp_ = (theta*constMult)*kernelFunc(xun);
+% C1 = prod(1 + temp_, 2);
+% 
+% % matlab's builtin fft is much faster and accurate
+% % eigenvalues must be real : Symmetric pos definite Kernel
+% vlambda = real(fft(C1));
+% end
+% function g = truncated_series(N, r)
+% tilde_g_0 = 0;
+% m = 1:(-1 + N/2);
+% tilde_g_h1 = N./abs(m).^(r);
+% m = (N/2):(-1 + N);
+% tilde_g_h2 = N./abs(N-m).^(r);
+% tilde_g = [tilde_g_0 tilde_g_h1 tilde_g_h2];
+% g = ifft(tilde_g)';
+% end
+% 
+% function c = truncated_series_kernel(x,r)
+% n = size(x, 1);
+% g = truncated_series(n,r);
+% c = g(1 + x*n);
+% end
 
 function [loss,Lambda,RKHSnorm] = ObjectiveFunction(theta,order,xun,ftilde)
-
+tol = 100*eps;
 n = length(ftilde);
 % [Lambda, Lambda_ring] = kernel(xun,obj.kernType,a,obj.order,...
 %   obj.avoidCancelError);
 arbMean = true;
-[Lambda] = kernel2(order, xun, theta);
+[Lambda] = kernel2(theta ,order, xun);
 
 % compute RKHSnorm
-temp = abs(ftilde(Lambda~=0).^2)./(Lambda(Lambda~=0)) ;
+%temp = abs(ftilde(Lambda~=0).^2)./(Lambda(Lambda~=0)) ;
+temp = abs(ftilde(Lambda>tol).^2)./(Lambda(Lambda>tol)) ;
 
 % compute loss: MLE
 if arbMean==true
@@ -209,10 +255,13 @@ else
 end
 
 % ignore all zero eigenvalues
-loss1 = sum(log(Lambda(Lambda~=0)))/n;
+loss1 = sum(log(Lambda(Lambda>tol)))/n;
 loss2 = log(temp_1);
 loss = (loss1 + loss2);
-fprintf('L1 %1.3f L2 %1.3f L %1.3f r %1.3e theta %1.3e\n', loss1, loss2, loss, order, theta)
+if imag(loss) ~= 0
+   keyboard
+end
+%fprintf('L1 %1.3f L2 %1.3f L %1.3f r %1.3e theta %1.3e\n', loss1, loss2, loss, order, theta)
 
 end
 
