@@ -5,13 +5,14 @@ function MWE_gaussian_diagnostics()
 
 format short
 close all
+gail.InitializeDisplay
 
 fNames = {'ExpCos','Keister','rand'};
 ptransforms = {'C1','C1sin', 'none'};
 fName = fNames{3};
 ptransform = ptransforms{3};
 
-npts = 2^7;  % max 14
+npts = 2^4;  % max 14
 dim = 3;
 rVec = 1.75;
 %rVec = [1.75 2.45 3.15]; %vector of possible r values
@@ -23,7 +24,7 @@ for r=rVec
   seed = randi([1,1e6],1,1)
   rfun = r/2;
   f_mean = 0;
-  f_std_a = 0.5;
+  f_std_a = 1;
   f_std_b = 1;
   theta = (f_std_a/f_std_b)^2;
   
@@ -71,7 +72,7 @@ for r=rVec
       objfun = @(lnParams) ...
         ObjectiveFunction(exp(lnParams(1)),1+exp(lnParams(2)),xlat,(ftilde));
       %% Plot the objective function
-      lnthetarange = (-1:0.2:2);
+      lnthetarange = (-2:0.2:2);
       lnorderrange = (-1:0.1:1);
       [lnthth,lnordord] = meshgrid(lnthetarange,lnorderrange);
       objobj = lnthth;
@@ -81,9 +82,12 @@ for r=rVec
          end
       end
       figure
-      surf(lnthth,lnordord,objobj)
-      xlabel('ln(theta)')
-      ylabel('ln(order-1)')
+      s = surf(lnthth,lnordord,objobj);
+      set(s,'EdgeColor','none','facecolor','interp')
+      set(gca,'xtick',log([0.2 0.4 1 3 7]),'xticklabel',{'0.2','0.4','1','3','7'}, ...
+         'ytick',log([1.4 1.6 2 2.6 3.7]-1), 'yticklabel',{'1.4', '1.6','2','2.6','3.7'})
+      xlabel('\(\theta\)')
+      ylabel('\(r\)')
       
       [~,which] = min(objobj,[],'all','linear');
       [whichrow,whichcol] = ind2sub(size(lnthth),which);
@@ -97,7 +101,8 @@ for r=rVec
       lnParamsOpt = fminsearch(objfun,[lnthOptAppx;lnordOptAppx],optimset('TolX',1e-3));
       thetaOpt = exp(lnParamsOpt(1));
       rOpt = 1 + exp(lnParamsOpt(2));
-%     end
+      hold on 
+      scatter3(lnParamsOpt(1),lnParamsOpt(2),objfun(lnParamsOpt)*1.002,1000,MATLABYellow,'.')%     end
 %   end
   
   % lambda1 = kernel(r, xlat_, thetaOpt);
