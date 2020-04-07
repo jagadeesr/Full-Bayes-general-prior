@@ -7,10 +7,11 @@ format short
 close all
 gail.InitializeDisplay
 
+whEx = 3;
 fNames = {'ExpCos','Keister','rand'};
 ptransforms = {'C1','C1sin', 'none'};
-fName = fNames{3};
-ptransform = ptransforms{3};
+fName = fNames{whEx};
+ptransform = ptransforms{whEx};
 
 npts = 2^4;  % max 14
 dim = 3;
