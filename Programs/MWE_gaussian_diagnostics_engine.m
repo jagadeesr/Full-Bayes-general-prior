@@ -1,13 +1,14 @@
 %
 % Minimum working example to test Gaussian diagnostics idea
 %
-function MWE_gaussian_diagnostics()
+function MWE_gaussian_diagnostics(whEx,dim,npts,rVec, ...
+   nReps,nPlots)
 
 format short
 close all
 gail.InitializeDisplay
 
-whEx = 3;
+%whEx = 3;
 fNames = {'ExpCos','Keister','rand'};
 ptransforms = {'C1','C1sin', 'none'};
 fName = fNames{whEx};
@@ -19,10 +20,12 @@ rVec = 1.75;
 %rVec = [1.75 2.45 3.15]; %vector of possible r values
 
 for r=rVec
+
+for ii = 1:nReps
   
   %parameters for random function
   %seed = 202326;
-  seed = randi([1,1e6],1,1)
+  seed = randi([1,1e6],1,1);
   rfun = r/2;
   f_mean = 0;
   f_std_a = 1;
@@ -56,20 +59,6 @@ for r=rVec
       fName, npts, ptransform, rfun))
   end
   
-%   if 0
-%     lnaMLE_opt = fminsearch(@(lna) ...
-%       ObjectiveFunction(exp(lna),r,xlat,(ftilde)), ...
-%       0,optimset('TolX',1e-2));
-%     thetaOpt = exp(lnaMLE_opt)
-%   else
-%     if 0
-%       thetaOpt = 1;
-%       ln_rOpt = fminsearch(@(lnr) ...
-%         ObjectiveFunction(thetaOpt,1+exp(lnr),xlat,(ftilde)), ...
-%         0,optimset('TolX',1e-2));
-%       rOpt = 1 + exp(ln_rOpt)
-%       r = rOpt;
-%     else %search for optimal kernel parameters
       objfun = @(lnParams) ...
         ObjectiveFunction(exp(lnParams(1)),1+exp(lnParams(2)),xlat,(ftilde));
       %% Plot the objective function
@@ -82,6 +71,7 @@ for r=rVec
             objobj(ii,jj) = objfun([lnthth(ii,jj); lnordord(ii,jj)]);
          end
       end
+   if ii <= nPlot
       figure
       s = surf(lnthth,lnordord,objobj);
       set(s,'EdgeColor','none','facecolor','interp')
@@ -89,6 +79,9 @@ for r=rVec
          'ytick',log([1.4 1.6 2 2.6 3.7]-1), 'yticklabel',{'1.4', '1.6','2','2.6','3.7'})
       xlabel('\(\theta\)')
       ylabel('\(r\)')
+      print('-depsc',['ObjFun-r-' num2str(r,2) '-th-' num2str(theta,2) ...
+         '-case-' int2str(ii) '.eps']);
+   end
       
       [objMinAppx,which] = min(objobj,[],'all','linear');
       [whichrow,whichcol] = ind2sub(size(lnthth),which);
@@ -104,9 +97,10 @@ for r=rVec
       objMin
       thetaOpt = exp(lnParamsOpt(1));
       rOpt = 1 + exp(lnParamsOpt(2));
+   if ii <= nPlot
       hold on 
       scatter3(lnParamsOpt(1),lnParamsOpt(2),objfun(lnParamsOpt)*1.002,1000,MATLABYellow,'.')%     end
-%   end
+   end
   
   % lambda1 = kernel(r, xlat_, thetaOpt);
   vlambda = kernel2(thetaOpt, rOpt, xlat);
@@ -120,8 +114,9 @@ for r=rVec
   vz_real = real(vz);  % vz must be real as intended by the transformation 
 
   % create_plots('normplot')
-  create_plots('qqplot', vz_real, fName, npts, ptransform, r, rOpt, theta, thetaOpt)
-  
+   if ii <= nPlot
+      create_plots('qqplot', vz_real, fName, npts, ptransform, r, rOpt, theta, thetaOpt)
+   end
   % Shapiro-Wilk test
   %   [H, pValue, W] = swtest(w_ftilde);
   %   Hval='true';
@@ -152,8 +147,10 @@ else
   plot(stNorm,sort(vz_real),'.','MarkerSize',20);
   hold on
   plot([-3 3], [-3 3],'-','linewidth',4)
-  xlabel('Standard Gaussian Quantiles
+  xlabel('Standard Gaussian Quantiles')
+  ylabel('Data Quantiles')
 end
+
 
 title(sprintf('%s r=%1.2f rOpt=%1.2f, theta=%1.2f, thetaOpt=%1.2f', ...
        fName, r, rOpt, theta, thetaOpt))
