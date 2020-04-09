@@ -1,8 +1,8 @@
 %
 % Minimum working example to test Gaussian diagnostics idea
 %
-function MWE_gaussian_diagnostics(whEx,dim,npts,rVec, ...
-   nReps,nPlots)
+function [theta, rOptAll, thOptAll] = ...
+   MWE_gaussian_diagnostics_engine(whEx,dim,npts,r,fpar,nReps,nPlots)
 
 format short
 close all
@@ -14,22 +14,23 @@ ptransforms = {'C1','C1sin', 'none'};
 fName = fNames{whEx};
 ptransform = ptransforms{whEx};
 
-npts = 2^6;  % max 14
-dim = 2;
-rVec = 1.75;
-%rVec = [1.75 2.45 3.15]; %vector of possible r values
+% npts = 2^6;  % max 14
+% dim = 2;
+% rVec = 1.75;
+%rVec = [1.75 2.45 3.15]; %vector of possible r valuesr
+rOptAll(nReps,1) = 0;
+thOptAll(nReps,1) = 0;
 
-for r=rVec
 
-for ii = 1:nReps
+for iii = 1:nReps
   
   %parameters for random function
   %seed = 202326;
   seed = randi([1,1e6],1,1);
   rfun = r/2;
-  f_mean = 0;
-  f_std_a = 1;
-  f_std_b = 1.5;
+  f_mean = fpar(3);
+  f_std_a = fpar(1);
+  f_std_b = fpar(2);
   theta = (f_std_a/f_std_b)^2;
   
   shift = rand(1,dim);
@@ -71,7 +72,7 @@ for ii = 1:nReps
             objobj(ii,jj) = objfun([lnthth(ii,jj); lnordord(ii,jj)]);
          end
       end
-   if ii <= nPlot
+   if iii <= nPlots
       figure
       s = surf(lnthth,lnordord,objobj);
       set(s,'EdgeColor','none','facecolor','interp')
@@ -79,8 +80,6 @@ for ii = 1:nReps
          'ytick',log([1.4 1.6 2 2.6 3.7]-1), 'yticklabel',{'1.4', '1.6','2','2.6','3.7'})
       xlabel('\(\theta\)')
       ylabel('\(r\)')
-      print('-depsc',['ObjFun-r-' num2str(r,2) '-th-' num2str(theta,2) ...
-         '-case-' int2str(ii) '.eps']);
    end
       
       [objMinAppx,which] = min(objobj,[],'all','linear');
@@ -97,9 +96,14 @@ for ii = 1:nReps
       objMin
       thetaOpt = exp(lnParamsOpt(1));
       rOpt = 1 + exp(lnParamsOpt(2));
-   if ii <= nPlot
+      rOptAll(iii) = rOpt;
+      thOptAll(iii) = thetaOpt;
+
+   if iii <= nPlots
       hold on 
       scatter3(lnParamsOpt(1),lnParamsOpt(2),objfun(lnParamsOpt)*1.002,1000,MATLABYellow,'.')%     end
+      print('-depsc',[ fName '-ObjFun-n-' int2str(npts) '-r-' int2str(r*100) ...
+         '-th-' int2str(100*theta) '-case-' int2str(iii) '.eps']);
    end
   
   % lambda1 = kernel(r, xlat_, thetaOpt);
@@ -114,8 +118,8 @@ for ii = 1:nReps
   vz_real = real(vz);  % vz must be real as intended by the transformation 
 
   % create_plots('normplot')
-   if ii <= nPlot
-      create_plots('qqplot', vz_real, fName, npts, ptransform, r, rOpt, theta, thetaOpt)
+   if iii <= nPlots
+      create_plots('qqplot', vz_real, fName, dim, iii, r, rOpt, theta, thetaOpt)
    end
   % Shapiro-Wilk test
   %   [H, pValue, W] = swtest(w_ftilde);
@@ -132,7 +136,8 @@ end
 
 end
 
-function create_plots(type, vz_real, fName, npts, ptransform, r, rOpt, theta, thetaOpt)
+
+function create_plots(type, vz_real, fName, dim, iii, r, rOpt, theta, thetaOpt)
 hFigNormplot = figure();
 set(hFigNormplot,'defaultaxesfontsize',16, ...
   'defaulttextfontsize',16, ... %make font larger
@@ -151,11 +156,18 @@ else
   ylabel('Data Quantiles')
 end
 
-
-title(sprintf('%s r=%1.2f rOpt=%1.2f, theta=%1.2f, thetaOpt=%1.2f', ...
-       fName, r, rOpt, theta, thetaOpt))
-saveas(hFigNormplot, sprintf('%s_%s_n-%d_Tx-%s_rOpt-%1.3f.png', ...
-       type, fName, npts, ptransform, r))
+title(['\(d = ' num2str(dim) ...
+   ',\ r = ' num2str(r,3) ...
+   ',\ r_{\textup{opt}} = ' num2str(rOpt,3) ...
+   ',\ \theta = ' num2str(theta,3) ...
+   ',\ \theta_{\textup{opt}} = ' num2str(thetaOpt,3) '\)'])
+print('-depsc',[fName '-QQPlot-n-' int2str(n) '-d-' ...
+   int2str(dim) '-' int2str(iii) '.eps'])
+   
+% title(sprintf('%s r=%1.2f rOpt=%1.2f, theta=%1.2f, thetaOpt=%1.2f', ...
+%        fName, r, rOpt, theta, thetaOpt))
+% saveas(hFigNormplot, sprintf('%s_%s_n-%d_Tx-%s_rOpt-%1.3f.png', ...
+%        type, fName, npts, ptransform, r))
 end
 
 % gaussian random function
