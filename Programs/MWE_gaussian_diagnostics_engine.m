@@ -1,7 +1,7 @@
 %
 % Minimum working example to test Gaussian diagnostics idea
 %
-function [theta, rOptAll, thOptAll] = ...
+function [theta, rOptAll, thOptAll, fName] = ...
    MWE_gaussian_diagnostics_engine(whEx,dim,npts,r,fpar,nReps,nPlots)
 
 format short

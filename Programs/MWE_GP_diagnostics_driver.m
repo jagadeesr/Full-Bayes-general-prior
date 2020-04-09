@@ -14,7 +14,7 @@ rOptAll(nrArr,nfPArr,nRep) = 0;
 thOptAll(nrArr,nfPArr,nRep) = 0;
 for jjj = 1:nrArr
    for kkk = 1:nfPArr
-      [thetaAll(jjj,kkk), rOptAll(jjj,kkk,:), thOptAll(jjj,kkk,:)] = ...
+      [thetaAll(jjj,kkk), rOptAll(jjj,kkk,:), thOptAll(jjj,kkk,:), fName] = ...
          MWE_gaussian_diagnostics_engine(fwh,dim,npts, ...
          rArray(jjj),fParArray(:,kkk),nRep,nPlot);
    end
@@ -27,7 +27,6 @@ nColArray = length(colorArray);
 for jjj = 1:nrArr
    for kkk = 1:nfPArr
       clrInd = mod(nfPArr*(jjj-1)+kkk-1,nColArray)+1;
-      [jjj kkk clrInd]
       clr = colorArray{clrInd};
       plot(reshape(rOptAll(jjj,kkk,:),[nRep,1]), ...
          reshape(thOptAll(jjj,kkk,:),[nRep,1]), ...
@@ -40,6 +39,6 @@ axis([1 6 0.01 100])
 set(gca,'yscale','log')
 xlabel('Inferred \(r\)')
 ylabel('Inferred \(\theta\)')
-print('-depsc',[fName '-rthInfer-n-' int2str(n) '-d-' ...
+print('-depsc',[fName '-rthInfer-n-' int2str(npts) '-d-' ...
    int2str(dim)])
 
